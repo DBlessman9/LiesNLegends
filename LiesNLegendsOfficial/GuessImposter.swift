@@ -11,10 +11,9 @@ import AVFoundation
 //This is supposed to be the inbetweeen screen before they guess the imposter
 struct Question: View {
     
+    @EnvironmentObject var gameVM: GameViewModel
     let roundPlayers: [Player]
-    let imposter: Player
-    let legitimates: [Player]
-    
+    @Binding var path: [AppRoute]
   
     var body: some View {
         ZStack{
@@ -32,7 +31,7 @@ Hints
             
             Text("When you are done giving hints...")
                    .bold()
-            NavigationLink(destination: GuessTheImposter(roundPlayers: roundPlayers, imposter: imposter, legitimates: legitimates)) {
+            NavigationLink(destination: GuessTheImposter(path: $path, roundPlayers: roundPlayers).environmentObject(gameVM)) {
                 ZStack{
                     RoundedRectangle(cornerRadius: 50)
                         .stroke(.black, lineWidth: 6)
@@ -54,31 +53,19 @@ Hints
 
 
 struct GuessTheImposter: View {
+    @Binding var path: [AppRoute]
+    @EnvironmentObject var gameVM: GameViewModel
     @State private var currentPlayerIndex = 0
     @State private var isFlipped = false
     @State private var selectedImposter: Player? // Store selected imposter for each player
-    @State private var playerSelections: [Player: Player?] = [:] // Track the selections for each player
-    
     let roundPlayers: [Player]
-    let imposter: Player
-    let legitimates: [Player]
     
     var currentPlayer: Player {
         roundPlayers[currentPlayerIndex]
     }
     
     func playSound(named soundName: String){
-        guard let url = Bundle.main.url(forResource: soundName, withExtension: "mp3") else{
-            print("Sound file not found")
-            return
-        }
-        do{
-            player = try AVAudioPlayer(contentsOf: url)
-            player?.play()
-        }catch {
-                        print("Error playing sound \(error.localizedDescription) ")
-                    }
-                
+        SoundManager.shared.playSound(named: soundName)
     }
     
     var body: some View {
@@ -115,7 +102,7 @@ struct GuessTheImposter: View {
                                     Button(action: {
                                         // Handle selection of imposter
                                         selectedImposter = player
-                                        playerSelections[currentPlayer] = player
+                                        gameVM.playerSelections[currentPlayer] = player
                                         moveToNextPlayer()
                                     }) {
                                         ZStack{
@@ -142,11 +129,8 @@ struct GuessTheImposter: View {
                 
                 // Flip Button
                 Button {
-                    playSound(named: "CARD FLIP")
-                    // Create haptic generator
-                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                    // trigger haptic feedback
-                    generator.impactOccurred()
+                    SoundManager.shared.playSound(named: "CARD FLIP")
+                    SoundManager.shared.playHaptic()
                     flipCard()
                 } label: {
                     ZStack {
@@ -166,7 +150,7 @@ struct GuessTheImposter: View {
                 .padding()
                 
                 // Show "Next Player" button after the selection
-                if let _ = playerSelections[currentPlayer], currentPlayerIndex < roundPlayers.count - 1 {
+                if let _ = gameVM.playerSelections[currentPlayer], currentPlayerIndex < roundPlayers.count - 1 {
                     Button {
                         moveToNextPlayer()
                     } label: {
@@ -186,8 +170,8 @@ struct GuessTheImposter: View {
                 }
                 
                 // Once all players have selected, show the results (or proceed to the next stage)
-                if playerSelections.count == roundPlayers.count {
-                    NavigationLink(destination: RevealImposterView(imposter: imposter, roundPlayers: roundPlayers, playerSelections: playerSelections)) {
+                if gameVM.playerSelections.count == roundPlayers.count {
+                    NavigationLink(destination: RevealImposterView(path: $path).environmentObject(gameVM)) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 50)
                                 .stroke(.black, lineWidth: 6)
@@ -207,43 +191,7 @@ struct GuessTheImposter: View {
         .onAppear {
             // Initialize player selections to nil for each player
             roundPlayers.forEach { player in
-                playerSelections[player] = nil
-            }
-        }
-    }
-    
-    func revealImposter() -> some View {
-        VStack {
-            Text("The Imposter was:")
-                .font(.title)
-                .padding()
-            
-            Text(imposter.name)
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundColor(.red)
-                .padding()
-            
-            Text("Players' Guesses:")
-                .font(.title2)
-                .padding(.top)
-            
-            ForEach(roundPlayers, id: \.id) { player in
-                HStack {
-                    Text("\(player.name) guessed: ")
-                        .font(.headline)
-                    
-                    if let guessedImposter = playerSelections[player] {
-                        Text(guessedImposter?.name ?? "No Selection")
-                            .font(.headline)
-                            .foregroundColor(guessedImposter == imposter ? .green : .red)
-                    } else {
-                        Text("No Selection")
-                            .font(.headline)
-                            .foregroundColor(.gray)
-                    }
-                }
-                .padding(.horizontal)
+                gameVM.playerSelections[player] = nil
             }
         }
     }
@@ -266,7 +214,7 @@ import SwiftUI
 
 
 #Preview {
-    Question(roundPlayers: xplayers, imposter: xplayers.last!, legitimates: legetimateplayers)
+    Question(roundPlayers: xplayers, path: .constant([]))
 }
 
 let xplayers: [Player] = [

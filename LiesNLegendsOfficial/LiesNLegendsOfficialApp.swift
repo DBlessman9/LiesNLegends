@@ -11,44 +11,23 @@ import AVFoundation
 
 @main
 struct LiesNLegendsApp: App {
-    @State private var player : AVAudioPlayer?
-    @State private var isPlaying : Bool = false
+    @StateObject private var gameVM = GameViewModel()
     
     var body: some Scene {
         WindowGroup {
             ZStack{
                 StartScreen()
+                    .environmentObject(gameVM)
                     .modelContainer(for: Player.self, inMemory: true)
                     .onAppear{
-                        playSound()
+                        print("App started")
+                        SoundManager.shared.playSound(named: "GAME MUSIC", numberOfLoops: -1)
                     }
                
                 
             }
         }
         
-    }
-    func playSound(){
-    guard let url = Bundle.main.url(forResource: "GAME MUSIC", withExtension: "mp3") else{
-    print("url not found")
-    return
-    }
-    do{
-    try AVAudioSession.sharedInstance().setActive(true)
-
-            if let player = player, player.isPlaying {
-                player.stop()
-                self.isPlaying = false
-            } else {
-                
-                player = try AVAudioPlayer(contentsOf: url, fileTypeHint: AVFileType.mp3.rawValue)
-                player!.numberOfLoops = -1
-                player!.play()
-                self.isPlaying = true
-            }
-        } catch let error as NSError {
-            print("error: \(error.localizedDescription)")
-        }
     }
 }
 

@@ -9,25 +9,20 @@ import SwiftUI
 import AVFoundation
 
 struct RevealImposterView: View {
-    @Environment(\.modelContext) private var context
-    
-    let imposter: Player
-    let roundPlayers: [Player]
-    let playerSelections: [Player: Player?]
-    
+    @Binding var path: [AppRoute]
+    @EnvironmentObject var gameVM: GameViewModel
     
     func removeImposters(from players: inout [Player]) {
         players.removeAll { $0.isImposter }
     }
     
     var body: some View {
-        NavigationStack {
             VStack {
                 Text("The Imposter was:")
                     .font(.title)
                     .padding()
                 
-                Text(imposter.name)
+                Text(gameVM.imposter?.name ?? "Unknown")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundColor(.red)
@@ -37,15 +32,15 @@ struct RevealImposterView: View {
                     .font(.title2)
                     .padding(.top)
                 
-                ForEach(roundPlayers, id: \.id) { player in
+                ForEach(gameVM.players, id: \.id) { player in
                     HStack {
                         Text("\(player.name) guessed: ")
                             .font(.headline)
                         
-                        if let guessedImposter = playerSelections[player] {
+                        if let guessedImposter = gameVM.playerSelections[player] {
                             Text(guessedImposter?.name ?? "No Selection")
                                 .font(.headline)
-                                .foregroundColor(guessedImposter == imposter ? .green : .red)
+                                .foregroundColor(guessedImposter == gameVM.imposter ? .green : .red)
                         } else {
                             Text("No Selection")
                                 .font(.headline)
@@ -56,10 +51,8 @@ struct RevealImposterView: View {
                 }
                 
                 // Button to restart or go to the next round
-                NavigationLink(destination: ListOfPlayers()) {
-                    
-                                    
-                        
+                NavigationLink(destination: ListOfPlayers(path: $path).environmentObject(gameVM),
+                               label: {
                     ZStack {
                         RoundedRectangle(cornerRadius: 50)
                             .stroke(.black, lineWidth: 6)
@@ -71,17 +64,16 @@ struct RevealImposterView: View {
                             .fontWeight(.bold)
                             .foregroundColor(.black)
                     }
-                }
+                })
                 .padding()
-//                .buttonStyle(.borderedProminent)
             }
             .navigationTitle("Imposter Revealed")
-        }
     }
 }
 
 #Preview {
-    RevealImposterView(imposter: mockImposter, roundPlayers: mockPlayers, playerSelections: mockPlayerSelections)
+    RevealImposterView(path: .constant([]))
+        .environmentObject(GameViewModel())
 }
 
 // Mock Data

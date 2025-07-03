@@ -10,10 +10,12 @@ import AVFoundation
 
 struct StartScreen: View {
     @State private var showRules = false
+    @State private var path: [AppRoute] = []
     @Environment(\.modelContext) private var context
+    @EnvironmentObject var gameVM: GameViewModel
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack {
                 HStack{
                     MusicView()
@@ -25,17 +27,15 @@ struct StartScreen: View {
                     .frame(width: 296, height: 80)
                     .padding()
                     .padding()
-//                CardFlipView()
+                //                CardFlipView()
                     .padding(.bottom, 30)
                 
                 ContFlipView()
                     .padding(.bottom, 30)
                 
-                NavigationLink{
-                  ListOfPlayers()
-                    
+                Button {
+                    path.append(.players)
                 } label: {
-                    
                     ZStack{
                         RoundedRectangle(cornerRadius: 50)
                             .stroke(.black, lineWidth: 6)
@@ -63,23 +63,25 @@ struct StartScreen: View {
                             .fontWeight(.bold)
                             .foregroundColor(.black)
                     }
-                                }
-                                .sheet(isPresented: $showRules) {
-                                    RulesScreen()
-                                }
-                
                 }
-            
+                .sheet(isPresented: $showRules) {
+                    RulesScreen()
+                }
             }
-        
             .background(Color.gray.frame(width: 4100, height: 9000))
-            
+            .navigationDestination(for: AppRoute.self) { route in
+                switch route {
+                case .players:
+                    ListOfPlayers(path: $path)
+                        .environmentObject(gameVM)
+                }
+            }
         }
-    
     }
-
+}
 
 #Preview {
    StartScreen()
+        .environmentObject(GameViewModel())
         .modelContainer(for: Player.self, inMemory: true)
 }

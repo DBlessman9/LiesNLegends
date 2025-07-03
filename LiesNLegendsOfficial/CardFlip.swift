@@ -48,42 +48,24 @@ struct ContFlipView: View {
     }
 
 struct CardFlipView: View {
+    @Binding var path: [AppRoute]
+    @EnvironmentObject var gameVM: GameViewModel
     @State private var angle: Double = 0
     @State private var isFlipped = false
     @State private var currentPlayerIndex = 0
-    @State private var shuffledPlayers: [Player]
-    @State private var hasFlipped: [Bool] // Track which players have flipped their card
-    @State private var imposter: Player? // Store the imposter
-    @State private var legitimates: [Player] = [] // Store legitimate players
-    let word: String
-    
-    var players: [Player]
-    
-    init(players: [Player], word: String) {
-        self.players = players
-        self.word = word
-        // Initialize shuffledPlayers with the full list of players
-        
-        _shuffledPlayers = State(initialValue: players)
-        _hasFlipped = State(initialValue: Array(repeating: false, count: players.count)) // Track who has flipped
-    }
+    @State private var shuffledPlayers: [Player] = []
+    @State private var hasFlipped: [Bool] = []
     
     var currentPlayer: Player {
-        shuffledPlayers[currentPlayerIndex]
+        guard !shuffledPlayers.isEmpty, currentPlayerIndex < shuffledPlayers.count else {
+            print("currentPlayerIndex \(currentPlayerIndex) out of bounds for shuffledPlayers (count: \(shuffledPlayers.count))")
+            return Player(name: "Unknown", status: "N/A", score: 0)
+        }
+        return shuffledPlayers[currentPlayerIndex]
     }
     
     func playSound(named soundName: String){
-        guard let url = Bundle.main.url(forResource: soundName, withExtension: "mp3") else{
-            print("Sound file not found")
-            return
-        }
-        do{
-            player = try AVAudioPlayer(contentsOf: url)
-            player?.play()
-        }catch {
-            print("Error playing sound \(error.localizedDescription) ")
-        }
-        
+        SoundManager.shared.playSound(named: soundName)
     }
     
     var body: some View {
@@ -131,7 +113,7 @@ struct CardFlipView: View {
                             .opacity(isFlipped ? 1 : 0)
                             .rotation3DEffect(.degrees(angle + 180), axis: (x: 0, y: 1, z: 0))
                         
-                        Text(word)
+                        Text(gameVM.currentWord)
                             .font(.title3)
                             .bold()
                             .padding(.top, 20)
@@ -146,11 +128,8 @@ struct CardFlipView: View {
                 
                 Button {
                     startFlipping()
-                    playSound(named: "CARD FLIP")
-                    // Create haptic generator
-                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                    // trigger haptic feedback
-                    generator.impactOccurred()
+                    SoundManager.shared.playSound(named: "CARD FLIP")
+                    SoundManager.shared.playHaptic()
                 } label: {
                     ZStack{
                         RoundedRectangle(cornerRadius: 50)
@@ -185,23 +164,7 @@ struct CardFlipView: View {
                 }
                 .padding()
                 
-                //                NavigationLink(destination: question(roundPlayers: shuffledPlayers, imposter: imposter ?? Player(name: "Unknown", status: "N/A", id: -1, score: 0, isImposter: false), legitimates: legitimates)) {
-                //                    ZStack{
-                //                        RoundedRectangle(cornerRadius: 50)
-                //                            .stroke(.black, lineWidth: 6)
-                //                            .font(.headline)
-                //                            .frame(width: 200, height: 40)
-                //                            .background(Color.white)
-                //                            .cornerRadius(50)
-                //                        Text("START ROUND")
-                //                            .fontWeight(.bold)
-                //                            .foregroundColor(.black)
-                //                    }
-                //
-                //                }
-                //                .padding()
-                
-                NavigationLink(destination: Question(roundPlayers: shuffledPlayers, imposter: imposter ?? Player(name: "Unknown", status: "N/A",  score: 0, isImposter: false), legitimates: legitimates)) {
+                NavigationLink(destination: Question(roundPlayers: shuffledPlayers, path: $path).environmentObject(gameVM)) {
                     ZStack{
                         RoundedRectangle(cornerRadius: 50)
                             .stroke(.black, lineWidth: 6)
@@ -221,23 +184,9 @@ struct CardFlipView: View {
         }
         .navigationBarBackButtonHidden(true)
         .onAppear {
-            
-            var legitimateArr:[Player] =  shuffledPlayers.map({player in
-                var updatedPlayer = player
-                updatedPlayer.isLegitimate = true
-                return updatedPlayer})
-            var result = assignImposter(from: &legitimateArr)
-            imposter = result.imposter
-            legitimates = result.legitimates
-            // Shuffle the players after assigning the imposter so the imposter is included
-            // shuffledPlayers.append(imposter ?? Player(name: "Unknown", status: "N/A", score: 0))
-            shuffledPlayers.shuffle()
-            
-            print("shuffledPlayers:\(shuffledPlayers)")
-            print("legtitimatePlayers:\(result.legitimates)")
-            print("imposter:\(result.imposter)")
-            
-            
+            print("CardFlipView appeared. Players: \(gameVM.players.map { $0.name })")
+            shuffledPlayers = gameVM.players.shuffled()
+            hasFlipped = Array(repeating: false, count: gameVM.players.count)
         }
     }
     
@@ -256,8 +205,11 @@ struct CardFlipView: View {
     }
     
     func passThePhone() {
+        print("Before increment: currentPlayerIndex = \(currentPlayerIndex), shuffledPlayers.count = \(shuffledPlayers.count)")
         if currentPlayerIndex < shuffledPlayers.count - 1 {
             currentPlayerIndex += 1
+        } else {
+            print("Attempted to increment past end of shuffledPlayers!")
         }
     }
     
@@ -276,18 +228,20 @@ struct CardFlipView: View {
         let randomIndex = Int.random(in: 0..<nonImposters.count)
         
         // Get the selected imposter
-        var imposter = nonImposters[randomIndex]
-        imposter.isImposter = true
+        let imposter = nonImposters[randomIndex]
         
         // Update players list: Make sure imposter is added and others are marked as legitimate
         players = players.map { player in
-            var updatedPlayer = player
+            let updatedPlayer = player
             if updatedPlayer.id == imposter.id {
-                updatedPlayer.isImposter = true
+                let mutablePlayer = updatedPlayer
+                // No mutation, just return
+                return mutablePlayer
             } else {
-                updatedPlayer.isImposter = false
+                let mutablePlayer = updatedPlayer
+                // No mutation, just return
+                return mutablePlayer
             }
-            return updatedPlayer
         }
         
         // Now create the list of legitimates (without the newly assigned imposter)
@@ -301,10 +255,7 @@ struct CardFlipView: View {
 
 //example
 #Preview {
-    CardFlipView(players: xplayers, word: """
-Michael 
-Jackson
-""")
+    CardFlipView(path: .constant([])).environmentObject(GameViewModel())
 }
 
 //example players

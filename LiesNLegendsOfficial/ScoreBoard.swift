@@ -7,14 +7,9 @@
 
 import SwiftUI
 
-enum GameState {
-    case setup
-    case statusPick
-    case playing
-    case gameOver
-}
-
-struct ScoreBoard {
+struct ScoreBoard: View {
+    @Binding var path: [AppRoute]
+    
     var players: [Player] = []
     
     var state = GameState.setup
