@@ -30,16 +30,30 @@ var categories = [motown, historicalFigures, phrases, popCulture, misc]
 struct PickACategory: View {
     @Binding var path: [AppRoute]
     @EnvironmentObject var gameVM: GameViewModel
+    @EnvironmentObject var soundManager: SoundManager
     
     func getRandomWord(from category: [String]) -> String {
         return category.randomElement() ?? "No word found"
     }
     
-    func startCategory(_ category: [String], name: String) {
+        func startCategory(_ category: [String], name: String) {
+        // Don't increment round here - this starts the round, doesn't complete it
+        // Round will be incremented when the round is actually completed
+        print("🔄 Starting round: Round \(gameVM.currentRound)")
+        
         let word = getRandomWord(from: category)
         print("Category picked: \(name), word: \(word), players: \(gameVM.players.map { $0.name })")
         gameVM.pickCategory(name, word: word)
         gameVM.assignRoles()
+
+        // Initialize player selections for the new round
+        for player in gameVM.players {
+            gameVM.playerSelections[player] = nil
+        }
+        gameVM.imposterAnswers.removeAll()
+
+        // Navigate to card flip view
+        path.append(.cardFlip)
     }
     
     var body: some View {
@@ -47,18 +61,64 @@ struct PickACategory: View {
                 Color(.background)
                     .ignoresSafeArea(edges: .all)
                 VStack {
+                    // Top bar with speaker button
+                    HStack {
+                        Spacer()
+                        SpeakerButton()
+                            .environmentObject(soundManager)
+                            .padding(.top, 10)
+                            .padding(.trailing, 20)
+                    }
+                    
                     Image("LogoDark")
                         .resizable()
                         .frame(width: 296, height: 80)
                         .padding()
                         .padding()
+                    
+                    // Show round and score information
+                    VStack(spacing: 10) {
+                        Text("Round \(gameVM.currentRound)")
+                            .font(.title)
+                            .foregroundColor(.green)
+                            .bold()
+                        
+                        // Always show scores, starting from Round 1
+                        Text("Current Scores:")
+                            .font(.headline)
+                            .padding(.top, 5)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 15) {
+                                ForEach(gameVM.players) { player in
+                                    VStack {
+                                        Text(player.name)
+                                            .font(.caption)
+                                            .bold()
+                                        Text("\(player.score)")
+                                            .font(.title3)
+                                            .foregroundColor(.green)
+                                    }
+                                    .padding(8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.white.opacity(0.9))
+                                    )
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                    .padding(.bottom, 20)
+                    
                     Text("Pick a Category...")
                         .font(.system(size: 30, weight: .bold, design: .default))
-                        .padding(.top, 40)
-                        .padding(.bottom, 40)
-                    NavigationLink(
-                        destination: CardFlipView(path: $path).environmentObject(gameVM),
-                        label: {
+                        .padding(.top, 5)
+                        .padding(.bottom, 20)
+                    
+                    Button {
+                        startCategory(phrases, name: "Sayings")
+                    } label: {
                         ZStack{
                             RoundedRectangle(cornerRadius: 50)
                                 .stroke(.black, lineWidth: 6)
@@ -70,14 +130,12 @@ struct PickACategory: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
                         }
-                    })
-                    .simultaneousGesture(TapGesture().onEnded {
-                        startCategory(phrases, name: "Sayings")
-                    })
+                    }
                     .padding(10)
-                    NavigationLink(
-                        destination: CardFlipView(path: $path).environmentObject(gameVM),
-                        label: {
+                    
+                    Button {
+                        startCategory(motown, name: "Motown")
+                    } label: {
                         ZStack{
                             RoundedRectangle(cornerRadius: 50)
                                 .stroke(.black, lineWidth: 6)
@@ -89,14 +147,12 @@ struct PickACategory: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
                         }
-                    })
-                    .simultaneousGesture(TapGesture().onEnded {
-                        startCategory(motown, name: "Motown")
-                    })
+                    }
                     .padding(10)
-                    NavigationLink(
-                        destination: CardFlipView(path: $path).environmentObject(gameVM),
-                        label: {
+                    
+                    Button {
+                        startCategory(historicalFigures, name: "History")
+                    } label: {
                         ZStack{
                             RoundedRectangle(cornerRadius: 50)
                                 .stroke(.black, lineWidth: 6)
@@ -108,14 +164,12 @@ struct PickACategory: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
                         }
-                    })
-                    .simultaneousGesture(TapGesture().onEnded {
-                        startCategory(historicalFigures, name: "History")
-                    })
+                    }
                     .padding(10)
-                    NavigationLink(
-                        destination: CardFlipView(path: $path).environmentObject(gameVM),
-                        label: {
+                    
+                    Button {
+                        startCategory(popCulture, name: "Pop Culture")
+                    } label: {
                         ZStack{
                             RoundedRectangle(cornerRadius: 50)
                                 .stroke(.black, lineWidth: 6)
@@ -127,14 +181,12 @@ struct PickACategory: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
                         }
-                    })
-                    .simultaneousGesture(TapGesture().onEnded {
-                        startCategory(popCulture, name: "Pop Culture")
-                    })
+                    }
                     .padding(10)
-                    NavigationLink(
-                        destination: CardFlipView(path: $path).environmentObject(gameVM),
-                        label: {
+                    
+                    Button {
+                        startCategory(misc, name: "Miscellaneous")
+                    } label: {
                         ZStack{
                             RoundedRectangle(cornerRadius: 50)
                                 .stroke(.black, lineWidth: 6)
@@ -146,13 +198,11 @@ struct PickACategory: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
                         }
-                    })
-                    .simultaneousGesture(TapGesture().onEnded {
-                        startCategory(misc, name: "Miscellaneous")
-                    })
+                    }
                     .padding(10)
                 }
             }
+            .navigationBarBackButtonHidden(true)
     }
 }
 

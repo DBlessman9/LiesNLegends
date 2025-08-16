@@ -21,7 +21,10 @@ extension UIApplication {
 struct ListOfPlayers: View {
     @Binding var path: [AppRoute]
     @EnvironmentObject var gameVM: GameViewModel
+    @EnvironmentObject var soundManager: SoundManager
     @State private var newName = ""
+    @State private var feedbackMessage = ""
+    @State private var showFeedback = false
     let minPlayers = 4
     let maxPlayers = 6
 
@@ -37,11 +40,20 @@ struct ListOfPlayers: View {
                 .onTapGesture {
                     UIApplication.shared.endEditing()
                 }
+            
             VStack {
+                // Top bar with speaker button
+                HStack {
+                    Spacer()
+                    SpeakerButton()
+                        .environmentObject(soundManager)
+                        .padding(.top, 10)
+                        .padding(.trailing, 20)
+                }
+                
                 Image("LogoDark")
                     .resizable()
                     .frame(width: 296, height: 80)
-                
                     .padding()
                 Text("Add Players")
                     .font(.largeTitle)
@@ -71,16 +83,45 @@ struct ListOfPlayers: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 350)
                 
+                // Feedback message
+                if showFeedback {
+                    Text(feedbackMessage)
+                        .foregroundColor(feedbackMessage.contains("✅") ? .green : .red)
+                        .font(.caption)
+                        .padding(.horizontal)
+                }
+                
                 Button {
                     let trimmedName = newName.trimmingCharacters(in: .whitespaces)
                     
-                    guard !trimmedName.isEmpty else { return }
+                    guard !trimmedName.isEmpty else { 
+                        feedbackMessage = "❌ Please enter a player name"
+                        showFeedback = true
+                        return 
+                    }
                     guard gameVM.players.count < maxPlayers else {
-                        print("Cannot add more than \(maxPlayers) players.")
+                        feedbackMessage = "❌ Cannot add more than \(maxPlayers) players"
+                        showFeedback = true
                         return
                     }
+                    
+                    // Store current count to check if player was added
+                    let currentCount = gameVM.players.count
                     gameVM.addPlayer(name: trimmedName)
-                    newName = ""
+                    
+                    // Check if player was actually added
+                    if gameVM.players.count > currentCount {
+                        feedbackMessage = "✅ Player '\(trimmedName)' added successfully"
+                        newName = ""
+                    } else {
+                        feedbackMessage = "❌ Player '\(trimmedName)' could not be added (duplicate name)"
+                    }
+                    showFeedback = true
+                    
+                    // Hide feedback after 3 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        showFeedback = false
+                    }
                 } label: {
                     
                     ZStack{
@@ -123,7 +164,7 @@ struct ListOfPlayers: View {
                 
                 
                 
-                NavigationLink(destination: PickACategory(path: $path).environmentObject(gameVM)) {
+                NavigationLink(destination: PickACategory(path: $path).environmentObject(gameVM).environmentObject(soundManager)) {
                     ZStack{
                         RoundedRectangle(cornerRadius: 50)
                             .stroke(.black, lineWidth: 6)
@@ -139,8 +180,7 @@ struct ListOfPlayers: View {
                     }
                     
                 }
-                
-                .disabled(gameVM.players.count < minPlayers)
+                .disabled(!gameVM.canStartGame())
                 
             }
             
